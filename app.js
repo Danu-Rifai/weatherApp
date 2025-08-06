@@ -23,92 +23,125 @@ tanggalElement.textContent = `${date} ${monthName}`;
 
 //get data from OpenWeatherAPI
 
-const API_KEY = "a2721393113508dae02625aa94291a9b";
+// =======================
+// KONFIGURASI API
+// =======================
+const apiKey = "a2721393113508dae02625aa94291a9b"; // Ganti dengan API key milikmu
 
-// 1. Ambil data cuaca dari API berdasarkan koordinat
-async function getWeatherByCoords(lat, lon) {
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=id`;
-    try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Gagal mengambil data cuaca");
-        const data = await res.json();
-        updateUI(data);
-    } catch (error) {
-        console.error(error);
+// =======================
+// AUTO FULLSCREEN SAAT REFRESH
+// =======================
+window.addEventListener("load", () => {
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Tidak bisa masuk fullscreen otomatis: ${err.message}`);
+        });
     }
-}
+    // Setelah masuk fullscreen → ambil cuaca lokasi user
+    getUserLocation();
+});
 
-// 2. Ambil data cuaca dari API berdasarkan nama kota
-async function getWeatherByCity(city) {
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=id`;
-    try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Kota tidak ditemukan");
-        const data = await res.json();
-        updateUI(data);
-    } catch (error) {
-        console.error(error);
-        alert("Kota tidak ditemukan atau terjadi kesalahan.");
-    }
-}
-
-// 3. Update tampilan HTML
-function updateUI(data) {
-    document.querySelector(".city").textContent = data.name;
-    document.querySelector(".suhu").innerHTML = `${Math.round(data.main.temp)}&deg;C`;
-    document.querySelector(".note").textContent = data.weather[0].description;
-    document.querySelector(".humidityInfo span:last-child").textContent = `${data.main.humidity}%`;
-    document.querySelector(".windInfo span:last-child").textContent = `${data.wind.speed} m/s`;
-
-    // Update icon cuaca sesuai dari API
-    const iconCode = data.weather[0].icon; // contoh: "10d"
-    document.querySelector(".icon img").src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
-}
-
-// 4. Ambil lokasi user
+// =======================
+// AMBIL LOKASI USER
+// =======================
 function getUserLocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                getWeatherByCoords(lat, lon);
+            position => {
+                let lat = position.coords.latitude;
+                let lon = position.coords.longitude;
+                getWeatherByLocation(lat, lon);
             },
-            (err) => {
-                console.warn("User menolak akses lokasi, gunakan default.");
+            error => {
+                console.warn("Tidak bisa ambil lokasi, tampilkan default Jakarta.");
                 getWeatherByCity("Jakarta");
             }
         );
     } else {
-        console.warn("Geolocation tidak didukung browser.");
+        console.warn("Browser tidak mendukung geolocation.");
         getWeatherByCity("Jakarta");
     }
 }
 
-// 5. Event listener untuk search bar
-function setupSearch() {
-    const input = document.querySelector(".input");
-    const searchIcon = document.querySelector(".searchBar svg");
+// =======================
+// FUNGSI AMBIL CUACA PAKAI KOORDINAT
+// =======================
+function getWeatherByLocation(lat, lon) {
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=id`;
+    fetchWeather(url);
+}
 
-    function search() {
-        const city = input.value.trim();
+// =======================
+// FUNGSI AMBIL CUACA PAKAI NAMA KOTA
+// =======================
+function getWeatherByCity(city) {
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=id`;
+    fetchWeather(url);
+}
+
+// =======================
+// FETCH DATA CUACA & TAMPILKAN KE HTML
+// =======================
+function fetchWeather(url) {
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            console.log(data); // Debug
+
+            // Ambil elemen
+            const cityElem = document.querySelector(".city");
+            const suhuElem = document.querySelector(".suhu");
+            const noteElem = document.querySelector(".note");
+            const iconElem = document.querySelector(".icon img");
+            const humidityElem = document.querySelector(".humidityInfo span:last-child");
+            const windElem = document.querySelector(".windInfo span:last-child");
+
+            // Isi data dari API
+            cityElem.textContent = data.name;
+            suhuElem.innerHTML = `${Math.round(data.main.temp)}&deg;C`;
+            noteElem.textContent = data.weather[0].description;
+            humidityElem.textContent = `${data.main.humidity}%`;
+            windElem.textContent = `${data.wind.speed} m/s`;
+
+            // Ganti ikon cuaca
+            const iconCode = data.weather[0].icon;
+            iconElem.src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+
+            // Update tanggal & hari
+            updateDate();
+        })
+        .catch(err => {
+            console.error("Gagal mengambil data cuaca:", err);
+        });
+}
+
+// =======================
+// UPDATE TANGGAL & HARI
+// =======================
+function updateDate() {
+    const hariElem = document.querySelector(".hari");
+    const tanggalElem = document.querySelector(".tanggal");
+
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    const now = new Date();
+    hariElem.textContent = `${days[now.getDay()]},`;
+    tanggalElem.textContent = `${now.getDate()} ${months[now.getMonth()]}`;
+}
+
+// =======================
+// EVENT SEARCH
+// =======================
+document.querySelector(".input").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+        let city = e.target.value.trim();
         if (city) {
             getWeatherByCity(city);
-            input.value = "";
+            e.target.value = "";
         }
     }
-
-    input.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") search();
-    });
-
-    searchIcon.addEventListener("click", search);
-}
-
-// 6. Inisialisasi saat halaman pertama kali load
-function init() {
-    getUserLocation();
-    setupSearch();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+});
